@@ -1,103 +1,94 @@
 import React, { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
+import { API_BASE_URL } from "../context/CartContext";
+import Particles from "react-tsparticles";
 
 function ResetPassword() {
-    const { uidb64, token } = useParams(); // get uid and token from URL
-    const navigate = useNavigate();
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const navigate = useNavigate();
 
-    const [password, setPassword] = useState("");
-    const [confirmPassword, setConfirmPassword] = useState("");
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState(null);
-    const [success, setSuccess] = useState(false);
+  const email = localStorage.getItem("resetEmail");
+  const token = localStorage.getItem("resetToken");
+  const otp = localStorage.getItem("resetOtp");
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setError(null);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-        if (password !== confirmPassword) {
-            setError("Passwords do not match!");
-            return;
-        }
-
-        setIsLoading(true);
-
-        try {
-            const response = await axios.patch(
-                `http://localhost:8000/api/accounts/users/reset-password/${uidb64}/${token}/`,
-                {
-                    password,
-                    confirm_password: confirmPassword,
-                }
-            );
-            console.log(response.data);
-            setSuccess(true);
-
-            // Redirect to login after 3 seconds
-            setTimeout(() => navigate("/login"), 3000);
-        } catch (err) {
-            console.error(err.response?.data || err.message);
-            setError(err.response?.data?.error || "Something went wrong");
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    if (success) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="bg-white p-8 rounded-2xl shadow-lg text-center">
-                    <h2 className="text-2xl font-bold text-green-600 mb-4">
-                        Password Reset Successful!
-                    </h2>
-                    <p>You will be redirected to login shortly.</p>
-                </div>
-            </div>
-        );
+    if (password !== confirmPassword) {
+      alert("Passwords do not match!");
+      return;
     }
 
-    return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-            <div className="bg-white p-8 rounded-2xl shadow-lg w-full max-w-md">
-                <h2 className="text-2xl font-bold mb-6 text-center">Reset Password</h2>
+    try {
+      await axios.post(`${API_BASE_URL}/accounts/users/password_reset/`, {
+        email,
+        otp,
+        token,
+        password,
+      });
 
-                {error && <p className="text-red-500 mb-4 text-center">{error}</p>}
+      alert("Password reset successful!");
+      localStorage.removeItem("resetEmail");
+      localStorage.removeItem("resetToken");
+      localStorage.removeItem("resetOtp");
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block mb-1 text-gray-700">New Password</label>
-                        <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="w-full border-2 border-gray-300 rounded-xl p-3 focus:outline-none focus:border-blue-500"
-                            required
-                        />
-                    </div>
+      navigate("/login");
+    } catch (error) {
+      alert(error.response?.data?.detail || "Error resetting password");
+    }
+  };
 
-                    <div>
-                        <label className="block mb-1 text-gray-700">Confirm Password</label>
-                        <input
-                            type="password"
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            className="w-full border-2 border-gray-300 rounded-xl p-3 focus:outline-none focus:border-blue-500"
-                            required
-                        />
-                    </div>
+  return (
+    <div className="relative min-h-screen bg-gray-950 flex justify-center items-center px-4">
+      {/* Background Particles */}
+      <Particles
+        className="absolute inset-0 -z-10"
+        options={{
+          particles: {
+            number: { value: 50 },
+            color: { value: ["#60a5fa", "#c084fc", "#f472b6"] },
+            size: { value: 3 },
+            move: { speed: 1, outMode: "out" },
+            opacity: { value: 0.4 },
+          },
+        }}
+      />
 
-                    <button
-                        type="submit"
-                        disabled={isLoading}
-                        className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-all disabled:opacity-50"
-                    >
-                        {isLoading ? "Resetting..." : "Reset Password"}
-                    </button>
-                </form>
-            </div>
-        </div>
-    );
+      {/* Reset Password Form */}
+      <form
+        onSubmit={handleSubmit}
+        className="relative z-10 bg-gray-900/90 backdrop-blur-md border border-gray-800 p-8 rounded-2xl shadow-2xl w-full max-w-md text-center"
+      >
+        <h2 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 mb-6">
+          Reset Password
+        </h2>
+        <input
+          type="password"
+          placeholder="New Password"
+          className="w-full p-3 mb-4 rounded-xl bg-gray-800 border border-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+        <input
+          type="password"
+          placeholder="Confirm Password"
+          className="w-full p-3 mb-4 rounded-xl bg-gray-800 border border-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          required
+        />
+        <button
+          type="submit"
+          className="w-full py-3 mt-2 rounded-xl bg-gradient-to-r from-green-500 to-teal-600 font-semibold text-white shadow-lg hover:scale-105 transition-transform"
+        >
+          Reset Password
+        </button>
+      </form>
+    </div>
+  );
 }
 
 export default ResetPassword;

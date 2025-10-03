@@ -1,78 +1,124 @@
+# fetch_books.py
 import os
 import django
 import requests
 from django.core.files.base import ContentFile
+from datetime import datetime
+import random
 
-# --- Setup Django environment ---
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "online_bookshaop.settings")
+# Set up Django environment
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'online_bookshaop.settings')
 django.setup()
 
 from bookstore.models import Book, Category
 
-# --- Function to fetch and save book ---
-def fetch_and_save_book_by_isbn(isbn, category_obj):
-    url = f"https://openlibrary.org/api/books?bibkeys=ISBN:{isbn}&format=json&jscmd=data"
-    resp = requests.get(url)
-    data = resp.json()
-    key = f"ISBN:{isbn}"
-    if key not in data:
-        print(f"ISBN {isbn} not found")
-        return None
-    book_data = data[key]
+def safe_print(text):
+    """Prints text safely, ignoring Unicode characters that can't be displayed in console."""
+    print(text.encode('utf-8', errors='ignore').decode('utf-8'))
 
-    title = book_data.get("title", "No Title")
-    authors = book_data.get("authors", [])
-    author_name = authors[0]["name"] if authors else "Unknown"
-    description = book_data.get("publishers", [])
-    description_text = ", ".join([pub["name"] for pub in description]) if description else ""
-    
-    # cover image
-    cover = book_data.get("cover", {}).get("large") or book_data.get("cover", {}).get("medium")
+def fetch_books():
+    categories_map = {
+        "fiction": "Fiction",
+        "nonfiction": "Non-Fiction",
+        "academic": "Academic",
+        "science": "Science",
+        "history": "History",
+        "fantasy": "Fantasy",
+        "biography": "Biography",
+        "mystery": "Mystery",
+    }
 
-    # Create or update Book
-    book, created = Book.objects.get_or_create(isbn=isbn, defaults={
-        "title": title,
-        "author": author_name,
-        "description": description_text,
-        "category": category_obj,
-        "price": 299.00  # default price
-    })
+    for subject, category_name in categories_map.items():
+        category, created = Category.objects.get_or_create(name=category_name)
+        if created:
+            safe_print(f"Created category: {category_name}")
 
-    # Download cover if exists
-    if cover and not book.cover_image:
-        image_resp = requests.get(cover)
-        if image_resp.status_code == 200:
-            book.cover_image.save(f"{isbn}.jpg", ContentFile(image_resp.content), save=False)
-    
-    book.save()
-    print(f"{'Created' if created else 'Updated'} book: {title}")
-    return book
+        url = f"https://openlibrary.org/subjects/{subject}.json?limit=10"
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            data = response.json()
+        except requests.RequestException as e:
+            safe_print(f"Failed to fetch books for {subject}: {e}")
+            continue
 
-# --- Main function to run ---
-def run():
-    # Fetch existing categories by name
-    try:
-        fiction = Category.objects.get(name="Fiction")
-        science = Category.objects.get(name="Non-Fiction")
-        history = Category.objects.get(name="Academic")
-    except Category.DoesNotExist as e:
-        print(f"Category not found: {e}")
-        return
+        for book_data in data.get("works", []):
+            title = book_data.get("title")
+            authors = ", ".join([a['name'] for a in book_data.get("authors", [])])
+            isbn = book_data.get("cover_edition_key", None)
 
-    # List of ISBNs with category mapping
-    books_to_fetch = [
-        ("9780743273565", fiction),  # The Great Gatsby
-        ("9780061120084", fiction),  # To Kill a Mockingbird
-        ("9780451524935", fiction),  # 1984
-        ("9780553380163", science),  # A Brief History of Time
-        ("9780198788607", science),  # The Selfish Gene
-        ("9780099590088", history),  # Sapiens
-        ("9780393317558", history),  # Guns, Germs, and Steel
-    ]
+            # Avoid duplicates
+            if isbn and Book.objects.filter(isbn=isbn).exists():
+                continue
 
-    for isbn, category_obj in books_to_fetch:
-        fetch_and_save_book_by_isbn(isbn, category_obj)
+            description = book_data.get("description", "")
+            if isinstance(description, dict):
+                description = description.get("value", "")
 
-# --- Execute ---
+            # Skip book if no cover image
+            if not isbn:
+                safe_print(f"Skipping '{title}' - no cover image available")
+                continue
+
+            # Cover image
+            cover_image = None
+            image_url = f"https://covers.openlibrary.org/b/olid/{isbn}-M.jpg"
+            try:
+                img_response = requests.get(image_url)
+                img_response.raise_for_status()
+                cover_image = ContentFile(img_response.content, name=f"{isbn}.jpg")
+            except requests.RequestException:
+                safe_print(f"Skipping '{title}' - failed to download cover image")
+                continue
+
+            # Additional details
+            publisher = book_data.get("publishers", ["Unknown"])[0] if book_data.get("publishers") else "Unknown"
+            
+            publication_date = None
+            first_publish_year = book_data.get("first_publish_year")
+            if first_publish_year:
+                try:
+                    publication_date = datetime(first_publish_year, 1, 1).date()
+                except:
+                    publication_date = None
+
+            pages = book_data.get("number_of_pages_median") or None
+
+            language = "English"
+            if book_data.get("languages"):
+                lang_codes = [l['key'].split('/')[-1] for l in book_data.get("languages")]
+                language = lang_codes[0].capitalize() if lang_codes else "English"
+
+            # Random rating, price, and stock
+            rating = round(random.uniform(3.0, 5.0), 2)
+            price = random.randint(100, 500)
+            stock = random.randint(5, 20)
+
+            # Truncate strings to avoid database errors
+            title = title[:200] if title else "No Title"
+            authors = (authors or "Unknown")[:100]
+            publisher = (publisher or "Unknown")[:100]
+
+            # Create book
+            Book.objects.create(
+                title=title,
+                author=authors,
+                price=price,
+                isbn=isbn or title[:20],
+                description=description or "No description available",
+                category=category,
+                cover_image=cover_image,
+                publisher=publisher,
+                publication_date=publication_date,
+                language=language,
+                pages=pages,
+                stock=stock,
+                rating=rating,
+                format="Paperback"
+            )
+            safe_print(f"Added book: {title}")
+
+    safe_print("Finished fetching books with cover images!")
+
 if __name__ == "__main__":
-    run()
+    fetch_books()

@@ -1,114 +1,106 @@
 import { useState, useEffect, useContext } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { AuthContext } from "../context/Auth";
-import { ShoppingCart } from "lucide-react";
 import { CartContext } from "../context/CartContext";
+import { ShoppingCart } from "lucide-react";
+import { AuthContext } from "../context/Auth";
 
 const Navbar = () => {
   const { getCartCount } = useContext(CartContext);
   const { data, setData } = useContext(AuthContext);
   const [isVisible, setIsVisible] = useState(false);
-  const navigate = useNavigate();
   const isAdmin = data?.user?.is_staff;
-  console.log(data);
+  const isAuthenticated = data?.isAuthenticated;
+  const navigate = useNavigate();
+
   useEffect(() => {
     setIsVisible(true);
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem("token"); // clear token
-    setData((prev) => {
-      return {
-        ...prev,
-        isAuthenticated: false,
-      };
-    });
-    navigate("/login"); // redirect
+    localStorage.removeItem("token");
+    setData((prev) => ({ ...prev, isAuthenticated: false, user: null }));
+    navigate("/login");
   };
 
   return (
-    <nav className="relative z-10 bg-white/90 backdrop-blur-lg border-b border-white/20 shadow-lg">
-      <div className="max-w-7xl mx-auto px-6 py-4">
-        <div className="flex justify-between items-center">
-          {/* Logo */}
-          <div className="flex items-center space-x-2">
-            <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">📚</span>
-            </div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              BookStore
-            </h1>
+    <nav className="fixed top-0 w-full z-50 bg-gray-900/80 backdrop-blur-md border-b border-gray-800 shadow-md transition-all">
+      <div className="max-w-7xl mx-auto px-6 py-3 flex justify-between items-center">
+        {/* Logo */}
+        <Link to="/" className="flex items-center space-x-3">
+          <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center shadow-md">
+            <img
+              src="https://img.freepik.com/free-vector/gradient-bookstore-logo_23-2149332422.jpg"
+              alt="BookStore Logo"
+              className="w-12 h-12 object-contain"
+            />
           </div>
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+            BookShop
+          </h1>
+        </Link>
 
-          {/* Menu */}
-          <div className="flex items-center space-x-8">
-            <ul className="flex space-x-8">
-              {!isAdmin && (
-                <Link to={"/cart"} className="relative">
-                  <ShoppingCart />
-                  <span className="bg-blue-600 absolute -top-4 -right-4 text-white text-xs font-bold px-2 py-1 rounded-full">
-                    {getCartCount()}
-                  </span>{" "}
-                </Link>
-              )}
-              {data.isAuthenticated &&
-                (isAdmin
-                  ? [
-                      { name: "Books", href: "/product-list" },
-                      { name: "Orders", href: "/orders" },
-                    ]
-                  : [
-                      { name: "Books", href: "/product-list" },
-                      { name: "Orders", href: "/orders" },
-                    ]
-                ).map((item, index) => (
-                  <li
-                    key={item.name}
-                    className={`transform transition-all duration-300 ${
-                      isVisible
-                        ? "translate-y-0 opacity-100"
-                        : "translate-y-4 opacity-0"
-                    }`}
-                    style={{ transitionDelay: `${index * 100}ms` }}
-                  >
-                    <Link
-                      to={item.href}
-                      className="text-gray-700 hover:text-transparent hover:bg-gradient-to-r hover:from-blue-600 hover:to-purple-600 hover:bg-clip-text font-medium transition-all duration-300 relative group"
-                    >
-                      {item.name}
-                      <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-gradient-to-r from-blue-600 to-purple-600 group-hover:w-full transition-all duration-300"></span>
-                    </Link>
-                  </li>
-                ))}
-            </ul>
+        {/* Navbar Links */}
+        <div className="flex items-center space-x-4 md:space-x-6">
+          {/* Books always visible */}
+          <Link
+            to="/product-list"
+            className="font-medium text-gray-200 hover:text-transparent hover:bg-clip-text hover:bg-gradient-to-r hover:from-blue-400 hover:to-pink-500 transition-all"
+          >
+            Books
+          </Link>
 
-            {/* Auth Buttons */}
-            <div className="flex items-center space-x-3">
-              {!data.isAuthenticated ? (
-                <>
-                  <Link
-                    to="/login"
-                    className="text-gray-700 hover:text-blue-600 font-medium transition-all duration-300 px-4 py-2 rounded-lg hover:bg-blue-50"
-                  >
-                    Sign In
-                  </Link>
-                  <Link
-                    to="/register"
-                    className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-lg font-medium hover:shadow-lg transform hover:scale-105 transition-all duration-300"
-                  >
-                    Sign Up
-                  </Link>
-                </>
-              ) : (
-                <button
-                  onClick={handleLogout}
-                  className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-all duration-300"
-                >
-                  Logout
-                </button>
-              )}
-            </div>
-          </div>
+          {/* Admin Links */}
+          {isAuthenticated && isAdmin && (
+            <>
+              <Link
+                to="/product-form"
+                className="font-medium text-gray-200 hover:text-transparent hover:bg-clip-text hover:bg-gradient-to-r hover:from-blue-400 hover:to-pink-500 transition-all"
+              >
+                Add Books
+              </Link>
+              <Link
+                to="/orders"
+                className="font-medium text-gray-200 hover:text-transparent hover:bg-clip-text hover:bg-gradient-to-r hover:from-blue-400 hover:to-pink-500 transition-all"
+              >
+                All Orders
+              </Link>
+            </>
+          )}
+
+          {/* Authentication Links */}
+          {!isAuthenticated ? (
+            <>
+              <Link
+                to="/login"
+                className="px-3 py-1 rounded-lg font-medium text-gray-200 hover:text-blue-400 hover:bg-gray-800 transition"
+              >
+                Sign In
+              </Link>
+              <Link
+                to="/register"
+                className="px-4 py-1 rounded-lg font-medium bg-gradient-to-r from-blue-600 to-purple-600 hover:shadow-lg transform hover:scale-105 transition-all text-white"
+              >
+                Sign Up
+              </Link>
+            </>
+          ) : (
+            <button
+              onClick={handleLogout}
+              className="px-3 py-1 bg-red-500 rounded-lg text-white hover:bg-red-600 transition-all"
+            >
+              Logout
+            </button>
+          )}
+
+          {/* Cart always visible if authenticated */}
+          {isAuthenticated && (
+            <Link to="/cart" className="relative ml-4">
+              <ShoppingCart className="text-gray-200 hover:text-blue-400 transition-colors" />
+              <span className="bg-blue-500 absolute -top-2 -right-2 text-xs text-white font-bold px-2 py-1 rounded-full shadow-md">
+                {getCartCount()}
+              </span>
+            </Link>
+          )}
         </div>
       </div>
     </nav>

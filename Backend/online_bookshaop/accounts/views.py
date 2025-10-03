@@ -12,6 +12,9 @@ from django.utils.encoding import smart_bytes, smart_str
 from django.core.mail import send_mail
 from drf_yasg.utils import swagger_auto_schema
 from django.contrib.auth import authenticate
+import random
+from django.core.signing import TimestampSigner,BadSignature,SignatureExpired
+signer = TimestampSigner()
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = CustomUser.objects.all()
@@ -19,7 +22,7 @@ class UserViewSet(viewsets.ModelViewSet):
    
     
     def get_permissions(self):
-        if self.action in ['register', 'login', 'password_reset_request', 'password_reset_confirm']:
+        if self.action in ['register', 'login', 'password_reset_request_otp', 'password_reset']:
             return [AllowAny()]
         return [IsAuthenticated()]
 
@@ -83,39 +86,55 @@ class UserViewSet(viewsets.ModelViewSet):
             "user": user_data
         }, status=status.HTTP_200_OK)
 
-    
-    @action(detail=False, methods=["post"])
-    def password_reset_request(self, request):
-        serializer = PasswordResetRequestSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        email = serializer.validated_data["email"]
-        user = CustomUser.objects.get(email=email)
-        uidb64 = urlsafe_base64_encode(smart_bytes(user.id))
-        token = PasswordResetTokenGenerator().make_token(user)
-        reset_link = f"http://localhost:3000/reset-password/{uidb64}/{token}/"
-        send_mail("Password Reset", f"Reset link: {reset_link}", "noreply@example.com", [email],fail_silently=False,)
-        return Response({"message": "Password reset link sent"}, status=status.HTTP_200_OK)
 
-   
-    @action(detail=False, methods=["patch"], url_path="reset-password/(?P<uidb64>[^/.]+)/(?P<token>[^/.]+)")
-    def password_reset_confirm(self, request, uidb64=None, token=None):
-        serializer = SetNewPasswordSerializer(data={**request.data, "uidb64": uidb64, "token": token})
-        serializer.is_valid(raise_exception=True)
-
+    @action(detail=False,methods=["post"],permission_classes=[AllowAny])
+    def password_reset_request_otp(self,request):
+        email = request.data.get("email")
+        
+        if not email:   
+            return Response({"detail":"Email required"},status=status.HTTP_400_BAD_REQUEST)
+        
         try:
-            uid = smart_str(urlsafe_base64_decode(uidb64))
-            user = CustomUser.objects.get(id=uid)
-        except Exception:
-            return Response({"error": "Invalid UID"}, status=400)
-
-        if not PasswordResetTokenGenerator().check_token(user, token):
-            return Response({"error": "Token is invalid or expired"}, status=400)
-
-        user.set_password(serializer.validated_data["password"])
+            user = CustomUser.objects.get(email=email)
+        except CustomUser.DoesNotExist:
+            return Response({"detail":"User not found"},status=status.HTTP_400_BAD_REQUEST)
+        otp = str(random.randint(100000,999999))
+        
+        token = signer.sign(f"{user.id}:{otp}")
+        
+        return Response({"otp":otp,"token":token},status = status.HTTP_200_OK)
+    
+    @action(detail=False,methods=["post"],permission_classes = [AllowAny])
+    def password_reset(self,request):
+        email = request.data.get("email")
+        otp = request.data.get("otp")
+        token = request.data.get("token")
+        new_password = request.data.get("password")
+        
+        if not all([email,otp,token,new_password]):
+            return Response({"detail":"All fields are required"},status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            user = CustomUser.objects.get(email=email)
+        except CustomUser.DoesNotExist:
+            return Response({"detail":"User not found"},status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            value = signer.unsign(token ,max_age=300)
+            print("values-------------",value)
+        except SignatureExpired:
+            return Response({"detail":"OTP expired"},status = status.HTTP_400_BAD_REQUEST)
+        except BadSignature:
+            return Response({"detail":"Invalid token"},status=status.HTTP_400_BAD_REQUEST)
+        
+        user_id, corrent_otp = value.split(":")
+        print("user_id, correct_otp:-----------",user_id,corrent_otp)
+        if str(user.id)!= user_id or otp!= corrent_otp:
+            return Response({"detail":"Invalid OTP"},status=status.HTTP_400_BAD_REQUEST)
+        user.set_password(new_password)
         user.save()
-        return Response({"message": "Password reset successful"}, status=200)
-
-   
+        return Response({"detail":"Password reset successfully"},status=status.HTTP_200_OK)
+    
     @action(detail=False, methods=["post"])
     def logout(self, request):
         try:

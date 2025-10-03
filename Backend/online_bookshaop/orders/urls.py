@@ -3,5 +3,6 @@ from .views import OrderViewSet
 
 router = DefaultRouter()
 router.register(r'orders', OrderViewSet, basename='orders')
+router.register(r'order-items', OrderViewSet, basename='order-items')
 
 urlpatterns = router.urls

@@ -52,3 +52,11 @@ class UserSerializer(serializers.ModelSerializer):
             "is_active"
         ]
         read_only_fields = ["id", "is_staff", "is_active", "date_joined"]
+        
+        
+class OTPRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+class OTPVerifySerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    otp = serializers.CharField()

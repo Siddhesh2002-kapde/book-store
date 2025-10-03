@@ -13,6 +13,8 @@ import EditBook from "./components/EditBook";
 import Cart from "./components/Cart";
 import { CartProvider } from "./context/CartContext";
 import Orders from "./components/Orders";
+import ScratchCardOTP from "./components/ScratchCardOTP";
+import EnterOTP from "./components/EnterOTP";
 
 function App() {
   const [loading, setLoading] = useState(true);
@@ -73,14 +75,28 @@ function App() {
       <CartProvider>
         <BrowserRouter>
           <Navbar />
-          <Routes>
+          {/* <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route
-              path="/reset-password/:uidb64/:token"
+              path="/password_reset_request_otp"
               element={<ResetPassword />}
             />
+            <Route path="/register" element={<Register />} />
+            <Route path="/product-list" element={<ProductList />} />
+            <Route path="/product-form" element={<ProductForm />} />
+            <Route path="/edit-book/:id" element={<EditBook />} />
+            <Route path="/cart" element={<Cart />} />
+            <Route path="/orders" element={<Orders />} />
+          </Routes> */}
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/scratch-card" element={<ScratchCardOTP />} />
+            <Route path="/enter-otp" element={<EnterOTP />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/register" element={<Register />} />
             <Route path="/product-list" element={<ProductList />} />
             <Route path="/product-form" element={<ProductForm />} />
